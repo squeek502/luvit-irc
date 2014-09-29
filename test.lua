@@ -1,5 +1,6 @@
 local IRC = require ('irc')
 local Formatting = require "irc/formatting"
+local string = require "string"
 
 local server = "irc.esper.net"
 local ssl = false

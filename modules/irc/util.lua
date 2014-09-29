@@ -1,3 +1,4 @@
+local string = require "string"
 local utils = {}
 utils.string = {}
 utils.table = {}
