@@ -1,46 +1,13 @@
-#!/usr/bin/env luvit
--- TODO: use getopt
--- TODO: use prompt and autocompletion
-
 local IRC = require ('irc')
+local Formatting = require "irc/formatting"
 
-local host = "irc.freenode.net"
-local port = 6667
+local server = "irc.esper.net"
 local ssl = false
-local c = nil
 local nick = "lubot3"
-local doEcho = false
-local useGpg = false
-
-function gpgDecrypt(user, msg, fn)
-	local cp = require ("childprocess")
-	--local g = cp.spawn("g", {"-e","pancake"}, {})
-	local string = require ("string")
-	-- first 11 chars are always the same?
-	msg = string.gsub(msg,'\'','\\\'')
-	local g = cp.spawn("/bin/sh", {"-c", "echo '"..msg.."' | g -O | g -d "})
-	--g.stdin:write (line)
---g.stdin:close()
-	g.stdout:on('data', function (ch)
-			p("DEC_DATA : "..ch)
---			c:privmsg (channel, ch)
-fn (ch)
-			end)
-	g.stdout:on('exit', function (c,s)
-			p("PRIVMSG")
-			--	c:privmsg (channel, line)
-			end)
---c:privmsg (channel, line)
-	
-end
-
--- host = "94.125.182.252" -- freenode
--- host = "173.225.186.74" -- oftc
--- host = "194.149.75.80" -- hispano
 
 local channel = ""
 
-local c = IRC.new ()
+local c = IRC:new (server, nick, {ssl=ssl, auto_join={"#squeektest"}})
 c:on ("connect", function (x)
 	if not x then
 		print ("Cannot connect")
@@ -48,126 +15,112 @@ c:on ("connect", function (x)
 	end
 	p ("Connected")
 end)
-c:on ("error", function (x)
-	p ("error")
+c:on ("error", function (msg)
+	p ("error", msg)
 	process.exit (1)
 end)
-c:on ("notice", function (host, msg)
-	p ("NOTICE", host, msg)
+c:on ("notice", function (from, to, msg)
+	from = from or c.server
+	print(string.format("-%s:%s- %s", from, to, msg))
 end)
 c:on ("data", function (x)
---		print ("::: "..x)
-	end)
-c:on ("join", function (x)
-		print ("--> joined to channel "..x)
-	end)
-local execline = nil
-local execerr = nil
-function evalstr(x)
-	local s = "local ret = ("..execline..")\n"..
-	"if ret then return ''..(ret) else return nil end"
-p("execline: ", s)
-	execline, execerr = loadstring (s)
-	if execline then
-		execline = execline ()
+	--print ("::: "..x)
+end)
+c:on ("join", function (channel, whojoined)
+	if c:isme(whojoined) then
+		print(string.format("Joined channel: %s", channel))
+		channel:on("+mode", function(mode, setby, param)
+			if setby == nil then return end
+			print(string.format("[%s] %s sets mode: %s%s",
+				channel,
+				setby,
+				"+"..mode.flag,
+				(param and " "..param or "")
+			))
+		end)
+		channel:on("-mode", function(mode, setby, param)
+			if setby == nil then return end
+			print(string.format("[%s] %s sets mode: %s%s",
+				channel,
+				setby,
+				"-"..mode.flag,
+				(param and " "..param or "")
+			))
+		end)
+		channel:on("quit", function(who, reason)
+			print(string.format("[%s] %s has quit", channel, who)..(reason and " ("..reason..")" or ""))
+		end)
+		channel:on("part", function(who, reason)
+			print(string.format("[%s] %s has left the channel", channel, who)..(reason and " ("..reason..")" or ""))
+		end)
+		channel:on("kick", function(who, by, reason)
+			print(string.format("[%s] %s has been kicked from the channel by %s", channel, who, by)..(reason and " ("..reason..")" or ""))
+		end)
+		channel:on("kill", function(who)
+			print(string.format("[%s] %s has been forcibly terminated by the server", channel, who))
+		end)
 	else
-		execline = nil
+		print(string.format("[%s] %s has joined the channel", channel, whojoined))
 	end
-p("execline: ", execline)
-end
-c:on ("privmsg", function (user, msg)
-		print ("<"..user.."> "..msg)
-		if msg:sub(1,1) == "!" then
-			execline = msg:sub(2)
-			if pcall (evalstr) then
-				if execline and #execline>0 then
-					c:privmsg (user, execline) -- eval
-				else
-					c:privmsg (user, "Uhm?") -- eval
-				end
-			else
-				if type (execline) == "string" then
-					c:privmsg (user, "error: "..execline)
-				else
-					c:privmsg (user, "error: oops ".. type (execline))
-				end
-			end
-		else
-			p ("GOECHO MSG "..msg)
-			if doEcho then
-				c:privmsg (user, msg) -- echo
-			else
-				p("Deciphering "..msg)
-				gpgDecrypt (user, msg, function (x)
-					p("msg",x)
-				end)
-			end
-		end
-	end)
-c:on ("quit", function (x)
-		c:close ()
-		process.exit (0)
-	end)
-c:on ("connected", function ()
-		p ("GOGOGOGO")
-	end)
-c:on ("ping", function (x)
-		p ("---> PING ",x)
-	end)
-c:on ("users", function (x, u)
-		p ("---> USERS FOR CHANNEL "..x.." <----")
-		p (u)
-	end)
-c:on ("servermsg", function (host, msg)
-	p ("SERVERMSG", msg)
-	end)
+end)
+c:on ("names", function(channel)
+	for nick,user in pairs(channel.users) do
+		print(" "..tostring(user))
+	end
+end)
+c:on ("part", function (channel, wholeft, reason)
+	if c:isme(wholeft) then
+		print(string.format("Left channel: %s", channel))
+	end
+end)
+c:on ("quit", function (whoquit, reason)
+	if c:isme(whoquit) then
+		print(string.format("Quit: %s", reason))
+	end
+end)
+c:on ("pm", function (from, msg)
+	print ("<"..from.."> "..Formatting.convert(msg))
+end)
+c:on ("message", function (from, to, msg)
+	print ("["..to.."] <"..from.."> "..Formatting.convert(msg))
+end)
+c:on ("disconnect", function (...)
+	p (...)
+end)
 
-function irc_cmd (line)
-p("---")
-	if line == "/quit" then
-		c:quit ()
-	elseif line:sub (1, 6) == "/join " then
-		channel = line:sub (6)
-		c:join (channel)
-	elseif line:sub (1, 6) == "/part " then
-		channel = line:sub (7)
-		c:part (channel)
-	elseif line:sub (1, 5) == "/part" then
-		c:part (channel)
-	elseif line:sub (1, 7) == "/query " then
-		channel = line:sub (7)
-	elseif line:sub (1, 7) == "/names" then
-		c:names (channel)
-	elseif line:sub (1, 1) == "!" then
-		c:write (line:sub (2).."\n")
-	else
-		if useGpg then
-			local cp = require ("childprocess")
-			--local g = cp.spawn("g", {"-e","pancake"}, {})
-			local string = require ("string")
--- first 11 chars are always the same?
-			line = string.gsub(line,'\'','\\\'')
-			local g = cp.spawn("/bin/sh", {"-c", "echo '"..line.."'|g -e pancake | g -o"})
-			--g.stdin:write (line)
-			--g.stdin:close()
-			g.stdout:on('data', function (ch)
-				p("DATA "..channel.. ": "..ch)
-				c:privmsg (channel, ch)
-			end)
-			g.stdout:on('exit', function (c,s)
-				p("PRIVMSG")
-			--	c:privmsg (channel, line)
-			end)
-			--c:privmsg (channel, line)
-		else
-			c:privmsg (channel, line)
+function irc_cmd (input)
+	local lines = require('irc/util').string.split(input, "\r?\n")
+
+	for _,line in ipairs(lines) do
+		if line ~= "" then
+			local args = require('irc/util').string.split(line, " ")
+			if args[1] == "/quit" then
+				c:disconnect ()
+			elseif args[1] == "/connect" then
+				c:connect ()
+			elseif args[1] == "/join" then
+				channel = args[2]
+				c:join (channel)
+			elseif args[1] == "/part" then
+				c:part (#args > 1 and args[2] or channel)
+			elseif args[1] == "/query" then
+				local target = args[2]
+				local text = require('irc/util').string.join(require('irc/util').table.slice(args, 3), " ")
+				c:say (target, text)
+			elseif args[1] == "/names" then
+				c:names (channel)
+			elseif line:sub (1, 1) == "!" then
+				c:write (line:sub (2).."\n")
+			else
+				c:say (channel, line)
+			end
 		end
 	end
 end
 
-p("connecting to "..host)
-c:connect (host, port, nick, {ssl=ssl})
+p("connecting to "..server)
+c:connect ()
 process.stdin:readStart ()
 process.stdin:on ("data", function (line)
-	irc_cmd (line:sub (1, #line-1))
+	irc_cmd (line)
 end)
