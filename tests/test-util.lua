@@ -1,5 +1,6 @@
 require("luvit-test/helper")
 
+local table = require "table"
 local util = require "irc/util"
 
 local joined = util.string.join({"one", "two", "three"})

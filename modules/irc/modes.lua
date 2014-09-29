@@ -1,5 +1,6 @@
 local instanceof = require('core').instanceof
 local util = require('./util')
+local table = require "table"
 
 local Modes = { flags = {} }
 

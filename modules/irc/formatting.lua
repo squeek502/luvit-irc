@@ -1,4 +1,5 @@
 local string = require "string"
+local table = require "table"
 local util = require "./util"
 local utils = require "utils"
 

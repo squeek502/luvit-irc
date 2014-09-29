@@ -1,4 +1,5 @@
 local util = require('./util')
+local table = require "table"
 
 local IRCMessage = require('core').Object:extend()
 
