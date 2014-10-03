@@ -1,6 +1,6 @@
 require("luvit-test/helper")
 
-local c = require "irc":new()
+local c = require "luvit-irc":new()
 
 local splitmsg = c:_splitlines("line without CRNL")
 assert_equal(0, #splitmsg)

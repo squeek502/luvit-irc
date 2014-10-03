@@ -1,15 +1,16 @@
 require("luvit-test/helper")
 
-local c = require "irc":new()
-local channel = require "irc/channel":new(c, "#testchannel")
-local samechannel = require "irc/channel":new(c, "#testchannel")
-local otherchannel = require "irc/channel":new(c, "#otherchannel")
+local c = require "luvit-irc":new()
+local Channel = require "luvit-irc/lib/channel"
+local testchannel = Channel:new(c, "#testchannel")
+local samechannel = Channel:new(c, "#testchannel")
+local otherchannel = Channel:new(c, "#otherchannel")
 
-assert(not channel:is(otherchannel))
-assert(channel:is(samechannel))
-assert(channel:is("#testchannel"))
+assert(not testchannel:is(otherchannel))
+assert(testchannel:is(samechannel))
+assert(testchannel:is("#testchannel"))
 
-channel:adduser("test")
+testchannel:adduser("test")
 
-assert(channel:getuser("test") ~= nil)
-assert_equal(channel, channel:getuser("test").parent)
+assert(testchannel:getuser("test") ~= nil)
+assert_equal(testchannel, testchannel:getuser("test").parent)

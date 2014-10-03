@@ -1,6 +1,6 @@
 require("luvit-test/helper")
 
-local c = require "irc":new()
+local c = require "luvit-irc":new()
 
 local dummymsg = "Dummy welcome message"
 local dummyserver = "dummy.irc.net"

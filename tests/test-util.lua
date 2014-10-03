@@ -1,7 +1,7 @@
 require("luvit-test/helper")
 
 local table = require "table"
-local util = require "irc/util"
+local util = require "luvit-irc/lib/util"
 
 local joined = util.string.join({"one", "two", "three"})
 assert_equal("string", type(joined))

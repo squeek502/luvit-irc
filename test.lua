@@ -1,5 +1,5 @@
-local IRC = require ('irc')
-local Formatting = require "irc/formatting"
+local IRC = require ('luvit-irc')
+local Formatting = require "luvit-irc/lib/formatting"
 local string = require "string"
 
 local server = "irc.esper.net"

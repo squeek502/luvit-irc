@@ -1,5 +1,4 @@
 local util = require('./util')
-
 local User = require('./user')
 local Modes = require('./modes')
 local Channel = require('core').Emitter:extend()

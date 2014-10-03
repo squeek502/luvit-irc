@@ -1,7 +1,7 @@
 require("luvit-test/helper")
 
-local c = require "irc":new()
-local Modes = require "irc/modes"
+local c = require "luvit-irc":new()
+local Modes = require "luvit-irc/lib/modes"
 
 c:_handlemsg(":warden.esper.net 005 lubot3 SAFELIST ELIST=CTU CHANTYPES=# EXCEPTS INVEX CHANMODES=eIbq,k,flj,CFLPQTcgimnprstz CHANLIMIT=#:50 PREFIX=(ov)@+ MAXLIST=bqeI:100 MODES=4 NETWORK=EsperNet KNOCK :are supported by this server")
 

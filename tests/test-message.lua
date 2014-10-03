@@ -1,6 +1,6 @@
 require("luvit-test/helper")
 
-local Message = require "irc/message"
+local Message = require "luvit-irc/lib/message"
 local string = require "string"
 
 local msg

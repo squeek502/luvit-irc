@@ -1,7 +1,7 @@
 require("luvit-test/helper")
 
-local Formatting = require "irc/formatting"
-local util = require "irc/util"
+local Formatting = require "luvit-irc/lib/formatting"
+local util = require "luvit-irc/lib/util"
 local utils = require "utils"
 
 -- stripstyles
