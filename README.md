@@ -12,13 +12,16 @@ TODO
 
 Example
 -------
-	local host = "irc-server-address"
-	local c = require ('irc').new ()
-	c:connect (host, 6667, "botnick")
-	c:on ("connect", function (x)
-		c:privmsg ("yournick", "hello world")
-		c:quit ()
-	end)
-	c:on ("quit", function ()
-		process.exit (0)
-	end)
+```lua
+local server = "irc.server.address"
+local IRC = require "luvit-irc"
+local c = IRC:new(server, "botnick")
+c:connect()
+c:on ("connect", function (welcomemsg, server, nick)
+	c:say ("yournick", "hello world")
+	c:disconnect ()
+end)
+c:on ("disconnect", function (disconnectmsg)
+	process.exit (0)
+end)
+```
