@@ -12,8 +12,9 @@ local util = require('./lib/util')
 local Message = require('./lib/message')
 local Channel = require('./lib/channel')
 local Modes = require('./lib/modes')
-local RPL = require('./lib/replies')
-local ERR = require('./lib/errors')
+local Constants = require('./lib/constants')
+local RPL = Constants.RPL
+local ERR = Constants.ERR
 
 local IRC = Emitter:extend()
 
