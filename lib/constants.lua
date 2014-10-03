@@ -1,5 +1,9 @@
 local Constants = {}
 
+local CTCP = {}
+CTCP.DELIM = "\001"
+Constants.CTCP = CTCP
+
 local RPL = {}
 RPL.WELCOME="001"
 RPL.YOURHOST="002"

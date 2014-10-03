@@ -15,6 +15,7 @@ local Modes = require('./lib/modes')
 local Constants = require('./lib/constants')
 local RPL = Constants.RPL
 local ERR = Constants.ERR
+local CTCP = Constants.CTCP
 
 local IRC = Emitter:extend()
 
@@ -199,11 +200,11 @@ function IRC:_disconnected(msg)
 end
 
 function IRC:_toctcp(type, text)
-	return "\001"..type.." "..text.."\001"
+	return CTCP.DELIM..type.." "..text..CTCP.DELIM
 end
 
 function IRC:_isctcp(text)
-	return text:len() > 2 and text:sub(1,1) == "\001" and text:find("\001", 2, true)
+	return text:len() > 2 and text:sub(1,1) == CTCP.DELIM and text:sub(-1) == CTCP.DELIM
 end
 
 function IRC:_nickchanged(oldnick, newnick)
