@@ -12,10 +12,8 @@ local util = require('./lib/util')
 local Message = require('./lib/message')
 local Channel = require('./lib/channel')
 local Modes = require('./lib/modes')
-local Constants = require('./lib/constants')
-local RPL = Constants.RPL
-local ERR = Constants.ERR
-local CTCP = Constants.CTCP
+local CTCP = require('./lib/constants').CTCP
+local Handlers = require('./lib/handlers')
 
 local IRC = Emitter:extend()
 
@@ -291,164 +289,10 @@ function IRC:_handlemsg(msg)
 	end
 	assert(instanceof(msg, Message), type(msg))
 
-	if msg.command == "PING" then
-		self:send(Message:new("PONG", unpack(msg.args)))
-		self:emit("ping", unpack(msg.args))
-	elseif msg.command == "PRIVMSG" then
-		local from = msg.nick
-		local to = msg.args[1]
-		local text = #msg.args >= 2 and msg.args[2] or ""
-		if not self:_isctcp(text) then
-			self:emit("message", from, to, text)
-			if to == self.nick then
-				self:emit("pm", from, text)
-			end
-		else
-			-- TODO: handle ctcp
-		end
-	elseif msg.command == "JOIN" then
-		local whojoined = msg.nick
-		local channelname = msg.args[1]
-		if self:isme(whojoined) then
-			self:_addchannel(channelname)
-			self:emit("ijoin", self:getchannel(channelname))
-		else
-			local channel = self:getchannel(channelname)
-			self:emit("join", channel, whojoined)
-		end
-	elseif msg.command == "PART" then
-		local wholeft = msg.nick
-		local channelname = msg.args[1]
-		local reason = #msg.args >= 2 and msg.args[2] or nil
-		local channel = self:getchannel(channelname)
-		if self:isme(wholeft) then
-			self:_removechannel(channelname)
-			self:emit("ipart", channel, reason)
-		else
-			self:emit("part", channel, wholeft, reason)
-		end
-	elseif msg.command == "NICK" then
-		local oldnick = msg.nick
-		local newnick = msg.args[1]
-		self:_nickchanged(oldnick, newnick)
-	elseif msg.command == "MODE" then
-		local setby = msg.nick
-		local channelname = msg.args[1]
-		local modes = msg.args[2]
-		local params = util.table.slice(msg.args, 3)
-		local channel = self:getchannel(channelname)
-		self:emit("mode", channel, setby, modes, params)
-	elseif msg.command == "NOTICE" then
-		local from = msg.nick
-		local to = msg.args[1]
-		local text = #msg.args > 1 and msg.args[2] or ""
-		self:emit("notice", from, to, text)
-	elseif msg.command == "TOPIC" then
-		local setby = msg.nick
-		local channel = msg.args[1]
-		local topic = msg.args[2]
-		self:emit("topic", channel, topic, setby)
-	elseif msg.command == RPL.TOPIC or msg.command == RPL.NOTOPIC then
-		local to = msg.args[1]
-		local channelname = msg.args[2]
-		local topic = msg.args[3]
-		self:emit("topic", channelname, topic, nil)
-	elseif msg.command == "KICK" then
-		local kickedby = msg.nick
-		local channelname = msg.args[1]
-		local kicked = msg.args[2]
-		local reason = #msg.args >= 3 and msg.args[3] or nil
-		local channel = self:getchannel(channelname)
-		if self:isme(kicked) then
-			self:_removechannel(channelname)
-			self:emit("ikick", channel, kickedby, reason)
-		else
-			self:emit("kick", channel, kicked, kickedby, reason)
-		end
-	elseif msg.command == "KILL" then
-		local killed = msg.args[1]
-		if self:isme(killed) then
-			self:emit("ikill", killed)
-			self:_disconnected("Killed by the server")
-		else
-			self:emit("kill", killed)
-		end
-	elseif msg.command == RPL.NAMREPLY then
-		local to = msg.args[1]
-		local channeltype = msg.args[2]
-		local channelname = msg.args[3]
-		local users = util.string.split(msg.args[4], " ")
-		local channel = self:getchannel(channelname)
-		for _,nick in ipairs(users) do
-			local mode = Modes.getmodebyprefix(nick:sub(1,1))
-			if mode ~= nil then
-				nick = nick:sub(2)
-			end
-			channel:adduser(nick)
-			if mode ~= nil then
-				mode:set(channel, nil, {nick})
-			end
-		end
-	elseif msg.command == RPL.ENDOFNAMES then
-		local to = msg.args[1]
-		local channelname = msg.args[2]
-		local text = msg.args[3]
-		local channel = self:getchannel(channelname)
-		self:emit("names", channel)
-	elseif msg.command == "INVITE" then
-		local from = msg.nick
-		local to = msg.args[1]
-		local channel = msg.args[2]
-		self:emit("invite", channel, from)
-	elseif msg.command == "QUIT" then
-		local whoquit = msg.nick
-		local reason = msg.args[1]
-		if self:isme(whoquit) then
-			self:emit("iquit", reason)
-			self:_disconnected("Quit: "..reason)
-		else
-			self:emit("quit", whoquit, reason)
-		end
-	elseif msg.command == RPL.WELCOME then
-		local actualnick = msg.args[1]
-		self:_nickchanged(self.nick, actualnick)
-		self:_connected(msg:lastarg(), msg.server)
-	elseif msg.command == ERR.NICKNAMEINUSE then
-		-- TODO: better handling of nickname in use/more options
-		self.nick = self.nick.."_"
-		self:send(Message:new("NICK", self.nick))
-	elseif msg.command == RPL.ISUPPORT then
-		for i,arg in ipairs(msg.args) do
-			local key, value = arg:match("^([A-Z]+)=?(.*)$")
-			if key == "CHANMODES" then
-				local flagsbytype = util.string.split(value, ",")
-				for flagtype, flagsstring in ipairs(flagsbytype) do
-					flags = util.string.split(flagsstring, "")
-					for _,flag in ipairs(flags) do
-						Modes.add(flag, flagtype)
-					end
-				end
-			elseif key == "PREFIX" then
-				local flagsstring, prefixesstring = value:match("^%((.*)%)(.*)$")
-				local flags = util.string.split(flagsstring, "")
-				local prefixes = util.string.split(prefixesstring, "")
-				assert(#flags==#prefixes)
-				for i,flag in ipairs(flags) do
-					Modes.add(flag, Modes.MODETYPE_USERPREFIX, prefixes[i])
-				end
-			end
-		end
-	elseif msg.command == RPL.MOTDSTART then
-		self.motd = msg:lastarg().."\n"
-	elseif msg.command == RPL.MOTD then
-		self.motd = (self.motd or "")..msg:lastarg().."\n"
-	elseif msg.command == RPL.ENDOFMOTD or msg.command == ERR.NOMOTD then
-		self.motd = (self.motd or "")..msg:lastarg().."\n"
-		self:emit("motd", self.motd)
-	elseif msg.command == "ERROR" then
-		self:_disconnected(msg:lastarg())
-	elseif msg.command == "PONG" then
-		self:emit("pong", unpack(msg.args))
+	if Handlers[msg.command] then
+		Handlers[msg.command](self, msg)
+	else
+		self:emit("unhandled", msg)
 	end
 end
 
