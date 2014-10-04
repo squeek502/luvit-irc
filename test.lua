@@ -102,19 +102,22 @@ function irc_cmd (input)
 			elseif args[1] == "/connect" then
 				c:connect ()
 			elseif args[1] == "/join" then
-				channel = args[2]
 				c:join (channel)
 			elseif args[1] == "/part" then
-				c:part (#args > 1 and args[2] or channel)
+				if #args > 1 then
+					c:part (args[2])
+				end
 			elseif args[1] == "/query" then
 				local target = args[2]
 				local text = util.string.join(util.table.slice(args, 3), " ")
 				c:say (target, text)
 			elseif args[1] == "/names" then
-				c:names (channel)
+				if #args > 1 then
+					c:names (args[2])
+				end
 			elseif line:sub (1, 1) == "!" then
-				c:write (line:sub (2).."\n")
-			else
+				c:write (line:sub (2).."\r\n")
+			elseif args[1]:sub(1,1) ~= "/" then
 				c:say ("#", line)
 			end
 		end
