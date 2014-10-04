@@ -7,8 +7,6 @@ local server = "irc.esper.net"
 local ssl = false
 local nick = "lubot3"
 
-local channel = ""
-
 local c = IRC:new (server, nick, {ssl=ssl, auto_join={"#squeektest", "#jkl"}})
 c:on ("connecting", function(nick, server, username, real_name)
 	print(string.format("Connecting to %s as %s...", server, nick))
@@ -28,7 +26,7 @@ c:on ("notice", function (from, to, msg)
 	print(string.format("-%s:%s- %s", from, to, msg))
 end)
 c:on ("data", function (...)
-	p (...)
+	--p (...)
 end)
 c:on ("ijoin", function (channel, whojoined)
 	print(string.format("Joined channel: %s", channel))
