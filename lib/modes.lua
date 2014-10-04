@@ -61,7 +61,11 @@ function Mode:unset(channel, setby, params)
 end
 
 function Modes.clear()
+	local flagstoremove = {}
 	for _,flag in ipairs(Modes.flags) do
+		table.insert(flagstoremove, flag)
+	end
+	for _,flag in ipairs(flagstoremove) do
 		Modes.remove(flag)
 	end
 end
@@ -73,7 +77,7 @@ function Modes.remove(flag)
 end
 
 function Modes.add(flag, type, prefix)
-	assert(Modes.get(flag) == nil)
+	assert(Modes.get(flag) == nil, tostring(util.table.findbyvalue(Modes, type)).." mode "..flag.." already exists")
 	Modes[flag] = Mode:new(flag, type, prefix)
 	table.insert(Modes.flags, flag)
 end
