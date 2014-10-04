@@ -25,9 +25,10 @@ Handlers["PRIVMSG"] = function(irc, msg)
 	local to = msg.args[1]
 	local text = #msg.args >= 2 and msg.args[2] or ""
 	if not irc:_isctcp(text) then
-		irc:emit("message", from, to, text)
-		if to == irc.nick then
+		if irc:isme(to) then
 			irc:emit("pm", from, text)
+		else
+			irc:emit("message", from, to, text)
 		end
 	else
 		-- TODO: handle ctcp
