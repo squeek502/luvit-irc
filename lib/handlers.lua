@@ -5,6 +5,8 @@ local Constants = require "./constants"
 local RPL = Constants.RPL
 local ERR = Constants.ERR
 
+local IGNORE = function() end
+
 local Handlers = {}
 
 Handlers["PING"] = function(irc, msg)
@@ -164,6 +166,17 @@ Handlers[ERR.NICKNAMEINUSE] = function(irc, msg)
 	irc.nick = irc.nick.."_"
 	irc:send(Message:new("NICK", irc.nick))
 end
+Handlers[RPL.YOURHOST] = IGNORE
+Handlers[RPL.CREATED] = IGNORE
+Handlers[RPL.LUSERCLIENT] = IGNORE
+Handlers[RPL.LUSEROP] = IGNORE
+Handlers[RPL.LUSERUNKNOWN] = IGNORE
+Handlers[RPL.LUSERCHANNELS] = IGNORE
+Handlers[RPL.LUSERME] = IGNORE
+Handlers[RPL.LOCALUSERS] = IGNORE
+Handlers[RPL.GLOBALUSERS] = IGNORE
+Handlers[RPL.STATSDLINE] = IGNORE
+-- TODO: Handle RPL.MYINFO (a fallback for RPL.ISUPPORT?)
 Handlers[RPL.ISUPPORT] = function(irc, msg)
 	for i,arg in ipairs(msg.args) do
 		local key, value = arg:match("^([A-Z]+)=?(.*)$")
