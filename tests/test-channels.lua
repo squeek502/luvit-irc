@@ -14,3 +14,6 @@ testchannel:adduser("test")
 
 assert(testchannel:getuser("test") ~= nil)
 assert_equal(testchannel, testchannel:getuser("test").parent)
+
+c:emit("join", samechannel, "testnick")
+assert(testchannel:getuser("testnick") ~= nil)

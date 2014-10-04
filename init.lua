@@ -40,6 +40,7 @@ function IRC:initialize(server, nick, options)
 	self.sock = nil
 	self.buffer = ""
 	self.connected = false
+	self.connecting = false
 	self.channels = {}
 	self.retrycount = 0
 	self.intentionaldisconnect = false
@@ -48,12 +49,12 @@ function IRC:initialize(server, nick, options)
 		self:connect()
 	end
 
-	self:on("kick", function(channel, kicked, kickedby, reason)
-		if self:isme(kicked) and self.options.auto_rejoin then
-			self:join(channel)
+	self:on("ikick", function(channel, kickedby, reason)
+		if self.options.auto_rejoin then
+			self:join(channel.name)
 		end
 	end)
-	self:on("connect", function(motd)
+	self:on("connect", function(welcomemsg)
 		for channel_or_i,channel_or_key in pairs(self.options.auto_join) do
 			if type(channel_or_i) == "string" then
 				self:join(channel_or_i, channel_or_key)
@@ -66,32 +67,36 @@ end
 
 function IRC:connect(num_retries)
 	if self.connected then
-		self:_disconnected("Initiating new connection")
+		self:disconnect("Reconnecting")
 	end
 
 	if num_retries then
-		p ("Connect retry #"..num_retries.." to "..self.server)
+		print("Connect retry #"..num_retries.." to "..self.server)
 	end
 
 	dns.resolve4(self.server, function (err, addresses)
-		server = addresses[1]
+		if not addresses then
+			self:emit("connecterror", "Could not resolve server address for "..tostring(self.server).." ("..tostring(err)..")", err)
+			return
+		end
+		local resolvedip = addresses[1]
 		if self.options.ssl then
 			if not TLS then
 				error ("luvit cannot require ('tls')")
 			end
-			TLS.connect (self.options.port, server, {}, function (err, client)
+			TLS.connect (self.options.port, resolvedip, {}, function (err, client)
 				self.sock = client
 				self:_handlesock(client)
-				self:_connect(self.nick, server)
+				self:_connect(self.nick, resolvedip)
 			end)
 		else
 			local sock = TCP:new ()
 			self.sock = sock
-			sock:connect(server, self.options.port)
+			sock:connect(resolvedip, self.options.port)
 			self:_handlesock(sock)
 			sock:on("connect", function ()
 				sock:readStart()
-				self:_connect(self.nick, server)
+				self:_connect(self.nick, resolvedip)
 			end)
 		end
 	end)
@@ -134,8 +139,8 @@ function IRC:disconnect(reason)
 	self.intentionaldisconnect = true
 	if self.connected then
 		self:send(Message:new("QUIT", reason))
-		self:close()
 	end
+	self:_disconnected(reason)
 end
 
 function IRC:names(channels)
@@ -169,8 +174,9 @@ function IRC:isme(nick)
 	return self.nick == nick
 end
 
-function IRC:_connect(nick, server)
+function IRC:_connect(nick, ip)
 	self.intentionaldisconnect = false
+	self.connecting = true
 	if self.options.password ~= nil then
 		self:send(Message:new("PASS", self.options.password))
 	end
@@ -180,22 +186,31 @@ function IRC:_connect(nick, server)
 	local unused_filler = "*"
 	local real_name = self.options.real_name
 	self:send(Message:new("USER", username, modeflag, unused_filler, real_name))
-	self:emit("connecting", nick, server, username, real_name)
+	self:emit("connecting", nick, self.server, username, real_name)
 end
 
-function IRC:_connected(msg, server)
+function IRC:_connected(welcomemsg, server)
 	assert(not self.connected)
+	self.connecting = false
 	self.connected = true
-	self:emit("connect", msg, server, self.nick)
+	self:_clearchannels()
+	Modes.clear()
+	self:emit("connect", welcomemsg, server, self.nick)
 end
 
-function IRC:_disconnected(msg)
+function IRC:_disconnected(reason)
+	local was_connected = self.connected
+	local was_connecting = self.connecting
 	self.connected = false
-	self.channels = {}
-	self:emit("disconnect", msg, self.server, self.nick, self.options)
+	self.connecting = false
+	if was_connected then
+		self:emit("disconnect", reason)
 
-	if not self.intentionaldisconnect and self.auto_retry then
-		self:connect(1)
+		if not self.intentionaldisconnect and self.auto_retry then
+			self:connect(1)
+		end
+	elseif was_connecting then
+		self:emit("connecterror", reason)
 	end
 end
 
@@ -210,9 +225,11 @@ end
 function IRC:_nickchanged(oldnick, newnick)
 	if oldnick == newnick then return end
 	if self:isme(oldnick) then
+		self:emit("inick", oldnick, newnick)
 		self.nick = newnick
+	else
+		self:emit("nick", oldnick, newnick)
 	end
-	self:emit("nick", oldnick, newnick)
 end
 
 function IRC:_addchannel(channelname)
@@ -224,7 +241,14 @@ end
 function IRC:_removechannel(channelname)
 	assert(self:getchannel(channelname) ~= nil)
 	local identifier = Channel.identifier(channelname)
+	self.channels[identifier]:destroy()
 	self.channels[identifier] = nil
+end
+
+function IRC:_clearchannels()
+	for identifier, channel in pairs(self.channels) do
+		self:_removechannel(channel.name)
+	end
 end
 
 function IRC:_handlesock(sock)
@@ -288,9 +312,10 @@ function IRC:_handlemsg(msg)
 		if self:isme(whojoined) then
 			self:_addchannel(channelname)
 			self:emit("ijoin", self:getchannel(channelname))
+		else
+			local channel = self:getchannel(channelname)
+			self:emit("join", channel, whojoined)
 		end
-		local channel = self:getchannel(channelname)
-		self:emit("join", channel, whojoined)
 	elseif msg.command == "PART" then
 		local wholeft = msg.nick
 		local channelname = msg.args[1]
@@ -299,8 +324,9 @@ function IRC:_handlemsg(msg)
 		if self:isme(wholeft) then
 			self:_removechannel(channelname)
 			self:emit("ipart", channel, reason)
+		else
+			self:emit("part", channel, wholeft, reason)
 		end
-		self:emit("part", channel, wholeft, reason)
 	elseif msg.command == "NICK" then
 		local oldnick = msg.nick
 		local newnick = msg.args[1]
@@ -329,20 +355,24 @@ function IRC:_handlemsg(msg)
 		self:emit("topic", channelname, topic, nil)
 	elseif msg.command == "KICK" then
 		local kickedby = msg.nick
-		local channel = msg.args[1]
+		local channelname = msg.args[1]
 		local kicked = msg.args[2]
 		local reason = #msg.args >= 3 and msg.args[3] or nil
 		local channel = self:getchannel(channelname)
 		if self:isme(kicked) then
-			self:removechannel(channelname)
+			self:_removechannel(channelname)
+			self:emit("ikick", channel, kickedby, reason)
+		else
+			self:emit("kick", channel, kicked, kickedby, reason)
 		end
-		self:emit("kick", channel, kicked, kickedby, reason)
 	elseif msg.command == "KILL" then
 		local killed = msg.args[1]
 		if self:isme(killed) then
+			self:emit("ikill", killed)
 			self:_disconnected("Killed by the server")
+		else
+			self:emit("kill", killed)
 		end
-		self:emit("kill", killed)
 	elseif msg.command == RPL.NAMREPLY then
 		local to = msg.args[1]
 		local channeltype = msg.args[2]
@@ -376,8 +406,9 @@ function IRC:_handlemsg(msg)
 		if self:isme(whoquit) then
 			self:emit("iquit", reason)
 			self:_disconnected("Quit: "..reason)
+		else
+			self:emit("quit", whoquit, reason)
 		end
-		self:emit("quit", whoquit, reason)
 	elseif msg.command == RPL.WELCOME then
 		local actualnick = msg.args[1]
 		self:_nickchanged(self.nick, actualnick)
