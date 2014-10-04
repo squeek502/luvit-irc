@@ -163,7 +163,7 @@ function IRC:_setupconnection()
 
 	dns.resolve4(self.server, function (err, addresses)
 		if not addresses then
-			self:emit("connecterror", "Could not resolve server address for "..tostring(self.server).." ("..tostring(err)..")", err)
+			self:_disconnected("Could not resolve address for "..tostring(self.server), err, false)
 			return
 		end
 		local resolvedip = addresses[1]
@@ -186,6 +186,27 @@ function IRC:_setupconnection()
 				self:_connect(self.nick, resolvedip)
 			end)
 		end
+	end)
+end
+
+function IRC:_handlesock(sock)
+	sock:on("data", function (data)
+		local lines = self:_splitlines(data)
+		for i = 1, #lines do
+			local line = lines[i]
+			local msg = self:_parsemsg(line)
+			self:_handlemsg(msg)
+			self:emit("data", line)
+		end
+	end)
+	sock:on("error", function (err)
+		self:_disconnected(err.message, err)
+	end)
+	sock:on("close", function (...)
+		self:_disconnected("Socket closed", ...)
+	end)
+	sock:on("end", function (...)
+		self:_disconnected("Socket ended", ...)
 	end)
 end
 
@@ -212,7 +233,8 @@ function IRC:_connected(welcomemsg, server)
 	self:emit("connect", welcomemsg, server, self.nick)
 end
 
-function IRC:_disconnected(reason, err)
+function IRC:_disconnected(reason, err, shouldretry)
+	if shouldretry == nil then shouldretry = true end
 	local was_connected = self.connected
 	local was_connecting = self.connecting
 	self.connected = false
@@ -220,7 +242,7 @@ function IRC:_disconnected(reason, err)
 	if was_connected or was_connecting then
 		self:emit(was_connected and "disconnect" or "connecterror", reason, err)
 
-		if self:_shouldretry() then
+		if self:_shouldretry() and shouldretry then
 			self.retrytask = Timer.setTimeout(self.options.retry_delay, function() 
 				self:connect(self.retrycount+1)
 			end)
@@ -267,27 +289,6 @@ function IRC:_clearchannels()
 	for identifier, channel in pairs(self.channels) do
 		self:_removechannel(channel.name)
 	end
-end
-
-function IRC:_handlesock(sock)
-	sock:on("data", function (data)
-		local lines = self:_splitlines(data)
-		for i = 1, #lines do
-			local line = lines[i]
-			local msg = self:_parsemsg(line)
-			self:_handlemsg(msg)
-			self:emit("data", line)
-		end
-	end)
-	sock:on("error", function (err)
-		self:_disconnected(err.message, err)
-	end)
-	sock:on("close", function (...)
-		self:_disconnected("Socket closed", ...)
-	end)
-	sock:on("end", function (...)
-		self:_disconnected("Socket ended", ...)
-	end)
 end
 
 function IRC:_splitlines(rawlines)
