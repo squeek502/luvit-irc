@@ -24,6 +24,11 @@ local function get_and_discard_matches(str, pattern, max_matches)
 	end
 end
 
+function IRCMessage:size()
+	-- str + \r\n
+	return tostring(self):len() + 2
+end
+
 function IRCMessage:fromstring(line)
 	if type(self) ~= "table" or self == IRCMessage then
 		if not line then line = self end

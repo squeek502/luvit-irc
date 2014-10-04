@@ -6,6 +6,7 @@ local Emitter = require('core').Emitter
 local dns = require('dns')
 local TCP = require('uv').Tcp
 local table = require('table')
+local os = require('os')
 local TLS = require('tls', false)
 local string = require('string')
 local Timer = require('timer')
@@ -15,6 +16,7 @@ local Channel = require('./lib/channel')
 local Modes = require('./lib/modes')
 local CTCP = require('./lib/constants').CTCP
 local Handlers = require('./lib/handlers')
+local Queue = require('./lib/queue')
 
 local IRC = Emitter:extend()
 
@@ -35,6 +37,7 @@ function IRC:initialize(server, nick, options)
 		auto_retry = true,
 		auto_join = {},
 		auto_rejoin = true,
+		flood_protection = true,
 	})
 	self.sock = nil
 	self.buffer = ""
@@ -44,6 +47,7 @@ function IRC:initialize(server, nick, options)
 	self.retrycount = 0
 	self.retrytask = nil
 	self.intentionaldisconnect = false
+	self.sendqueue = Queue:new(self)
 
 	if self.options.auto_connect then
 		self:connect()
@@ -62,6 +66,9 @@ function IRC:initialize(server, nick, options)
 				self:join(channel_or_key)
 			end
 		end
+	end)
+	self:on("pong", function()
+		self.sendqueue:unlock()
 	end)
 end
 
@@ -117,7 +124,7 @@ end
 function IRC:disconnect(reason)
 	self.intentionaldisconnect = true
 	if self.connected then
-		self:send(Message:new("QUIT", reason))
+		self:_send(Message:new("QUIT", reason))
 	end
 	self:_disconnected(reason or "Quit")
 end
@@ -127,12 +134,34 @@ function IRC:names(channels)
 	self:send(Message:new("NAMES", channels))
 end
 
-function IRC:send(msg, callback)
+function IRC:floodprotection(enabled, interval)
+	self.options.flood_protection = enabled
+	if not self.options.flood_protection then
+		for _,unsentmsg in ipairs(self.sendqueue.queue) do
+			self:_send(unsentmsg)
+		end
+	end
+	self.sendqueue:clear()
+end
+
+function IRC:ping()
+	self:_send(Message:new("PING", self.server))
+end
+
+function IRC:send(msg)
+	if self.options.flood_protection then
+		self.sendqueue:push(msg)
+	else
+		self:_send(msg)
+	end
+end
+
+function IRC:_send(msg, callback)
 	self:write(tostring(msg).."\r\n", callback)
 end
 
-function IRC:write(msg, callback)
-	self.sock:write(msg, callback)
+function IRC:write(data, callback)
+	self.sock:write(data, callback)
 end
 
 function IRC:close()
@@ -156,6 +185,7 @@ end
 function IRC:_setupconnection()
 	self.intentionaldisconnect = false
 	self.connecting = true
+	self.sendqueue:clear()
 
 	if self.retrytask ~= nil then
 		Timer.clearTimer(self.retrytask)
