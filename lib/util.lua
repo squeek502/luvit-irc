@@ -102,7 +102,7 @@ end
 utils.table.findandremove = function (tbl, value)
 	local key = utils.table.findbyvalue(tbl, value)
 	if key then
-		if #key > 0 then
+		if #tbl > 0 then
 			table.remove(tbl, key)
 		else
 			table[key] = nil
