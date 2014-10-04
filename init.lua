@@ -59,6 +59,9 @@ function IRC:initialize(server, nick, options)
 		end
 	end)
 	self:on("connect", function(welcomemsg)
+		-- get our own user info if we don't already have it
+		self:send(Message:new("WHOIS", self.nick))
+		-- auto join channels on connect
 		for channel_or_i,channel_or_key in pairs(self.options.auto_join) do
 			if type(channel_or_i) == "string" then
 				self:join(channel_or_i, channel_or_key)
@@ -149,10 +152,18 @@ function IRC:ping()
 end
 
 function IRC:send(msg)
-	if self.options.flood_protection then
-		self.sendqueue:push(msg)
-	else
-		self:_send(msg)
+	local msgs = {msg}
+	repeat
+		local spillovermsg = msgs[#msgs]:trimtosize(self)
+		table.insert(msgs, spillovermsg)
+	until spillovermsg == nil
+
+	for _,msg in ipairs(msgs) do
+		if self.options.flood_protection then
+			self.sendqueue:push(msg)
+		else
+			self:_send(msg)
+		end
 	end
 end
 

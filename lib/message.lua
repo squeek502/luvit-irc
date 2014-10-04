@@ -1,11 +1,17 @@
 local util = require('./util')
 local table = require "table"
+local string = require "string"
+local MAX_MESSAGE_SIZE = require "./constants".MAX_MESSAGE_SIZE
 
 local IRCMessage = require('core').Object:extend()
 
 function IRCMessage:initialize(command, ...)
 	self.command = command
 	self.args = {...}
+end
+
+function IRCMessage:clone()
+	return IRCMessage:new(self.command, unpack(self.args))
 end
 
 function IRCMessage:lastarg()
@@ -27,6 +33,41 @@ end
 function IRCMessage:size()
 	-- str + \r\n
 	return tostring(self):len() + 2
+end
+
+function IRCMessage:toservermsg(connection)
+	local servermsg = self:clone()
+	servermsg.nick = connection.nick
+	servermsg.host = connection.host or string.rep("x", 63) -- maximum size of a hostname
+	servermsg.user = connection.user or string.rep("x", 16) -- approximation of the length of a username
+	return servermsg
+end
+
+function IRCMessage:serversize(connection)
+	return self:toservermsg(connection):size()
+end
+
+function IRCMessage:serverstring(connection)
+	return tostring(self:toservermsg(connection))
+end
+
+function IRCMessage:trimtosize(connection)
+	local spillovermsg = nil
+	local size = self:serversize(connection)
+	if size > MAX_MESSAGE_SIZE then
+		local lastarg = self:lastarg()
+		local lastarg_size = lastarg:len()
+		local sizeavailable = MAX_MESSAGE_SIZE - (size - lastarg_size)
+		local trimmed = lastarg:sub(1, sizeavailable)
+		local lastwordbreak = trimmed:find("[^%w]%w-$")
+		local finaltrimpoint = lastwordbreak or sizeavailable
+		trimmed = trimmed:sub(1, finaltrimpoint)
+		local excess = lastarg:sub(finaltrimpoint+1)
+		self.args[#self.args] = trimmed
+		spillovermsg = self:clone()
+		spillovermsg.args[#spillovermsg.args] = excess
+	end
+	return spillovermsg
 end
 
 function IRCMessage:fromstring(line)

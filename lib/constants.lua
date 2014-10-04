@@ -1,4 +1,5 @@
 local Constants = {}
+Constants.MAX_MESSAGE_SIZE = 512
 
 local CTCP = {}
 CTCP.DELIM = "\001"

@@ -129,6 +129,22 @@ Handlers[RPL.TOPIC] = function(irc, msg)
 end
 Handlers[RPL.NOTOPIC] = Handlers[RPL.TOPIC]
 
+-- whois
+Handlers[RPL.WHOISUSER] = function(irc, msg)
+	local to = msg.args[1]
+	local nick = msg.args[2]
+	local user = msg.args[3]
+	local host = msg.args[4]
+	local unused = msg.args[5]
+	local realname = msg.args[6]
+	if irc:isme(nick) then
+		irc.host = host
+		irc.user = user
+	end
+	-- TODO: handle other users
+end
+-- TODO: handle other whois replies
+
 -- names
 Handlers[RPL.NAMREPLY] = function(irc, msg)
 	local to = msg.args[1]
