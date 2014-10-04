@@ -8,6 +8,7 @@ local TCP = require('uv').Tcp
 local table = require('table')
 local TLS = require('tls', false)
 local string = require('string')
+local Timer = require('timer')
 local util = require('./lib/util')
 local Message = require('./lib/message')
 local Channel = require('./lib/channel')
@@ -41,6 +42,7 @@ function IRC:initialize(server, nick, options)
 	self.connecting = false
 	self.channels = {}
 	self.retrycount = 0
+	self.retrytask = nil
 	self.intentionaldisconnect = false
 
 	if self.options.auto_connect then
@@ -64,40 +66,19 @@ function IRC:initialize(server, nick, options)
 end
 
 function IRC:connect(num_retries)
+	if num_retries ~= nil then
+		if self.connected then
+			return
+		end
+		self.retrycount = num_retries
+		print("Connect retry #"..self.retrycount.." to "..self.server)
+	end
+
 	if self.connected then
 		self:disconnect("Reconnecting")
 	end
 
-	if num_retries then
-		print("Connect retry #"..num_retries.." to "..self.server)
-	end
-
-	dns.resolve4(self.server, function (err, addresses)
-		if not addresses then
-			self:emit("connecterror", "Could not resolve server address for "..tostring(self.server).." ("..tostring(err)..")", err)
-			return
-		end
-		local resolvedip = addresses[1]
-		if self.options.ssl then
-			if not TLS then
-				error ("luvit cannot require ('tls')")
-			end
-			TLS.connect (self.options.port, resolvedip, {}, function (err, client)
-				self.sock = client
-				self:_handlesock(client)
-				self:_connect(self.nick, resolvedip)
-			end)
-		else
-			local sock = TCP:new ()
-			self.sock = sock
-			sock:connect(resolvedip, self.options.port)
-			self:_handlesock(sock)
-			sock:on("connect", function ()
-				sock:readStart()
-				self:_connect(self.nick, resolvedip)
-			end)
-		end
-	end)
+	self:_setupconnection()
 end
 
 function IRC:say(target, text)
@@ -138,7 +119,7 @@ function IRC:disconnect(reason)
 	if self.connected then
 		self:send(Message:new("QUIT", reason))
 	end
-	self:_disconnected(reason)
+	self:_disconnected(reason or "Quit")
 end
 
 function IRC:names(channels)
@@ -172,9 +153,43 @@ function IRC:isme(nick)
 	return self.nick == nick
 end
 
-function IRC:_connect(nick, ip)
+function IRC:_setupconnection()
 	self.intentionaldisconnect = false
 	self.connecting = true
+
+	if self.retrytask ~= nil then
+		Timer.clearTimer(self.retrytask)
+	end
+
+	dns.resolve4(self.server, function (err, addresses)
+		if not addresses then
+			self:emit("connecterror", "Could not resolve server address for "..tostring(self.server).." ("..tostring(err)..")", err)
+			return
+		end
+		local resolvedip = addresses[1]
+		if self.options.ssl then
+			if not TLS then
+				error ("Failed to require ('tls')")
+			end
+			TLS.connect (self.options.port, resolvedip, {}, function (err, client)
+				self.sock = client
+				self:_handlesock(client)
+				self:_connect(self.nick, resolvedip)
+			end)
+		else
+			local sock = TCP:new ()
+			self.sock = sock
+			sock:connect(resolvedip, self.options.port)
+			self:_handlesock(sock)
+			sock:on("connect", function ()
+				sock:readStart()
+				self:_connect(self.nick, resolvedip)
+			end)
+		end
+	end)
+end
+
+function IRC:_connect(nick, ip)
 	if self.options.password ~= nil then
 		self:send(Message:new("PASS", self.options.password))
 	end
@@ -189,6 +204,7 @@ end
 
 function IRC:_connected(welcomemsg, server)
 	assert(not self.connected)
+	self.retrycount = 0
 	self.connecting = false
 	self.connected = true
 	self:_clearchannels()
@@ -196,20 +212,24 @@ function IRC:_connected(welcomemsg, server)
 	self:emit("connect", welcomemsg, server, self.nick)
 end
 
-function IRC:_disconnected(reason)
+function IRC:_disconnected(reason, err)
 	local was_connected = self.connected
 	local was_connecting = self.connecting
 	self.connected = false
 	self.connecting = false
-	if was_connected then
-		self:emit("disconnect", reason)
+	if was_connected or was_connecting then
+		self:emit(was_connected and "disconnect" or "connecterror", reason, err)
 
-		if not self.intentionaldisconnect and self.auto_retry then
-			self:connect(1)
+		if self:_shouldretry() then
+			self.retrytask = Timer.setTimeout(self.options.retry_delay, function() 
+				self:connect(self.retrycount+1)
+			end)
 		end
-	elseif was_connecting then
-		self:emit("connecterror", reason)
 	end
+end
+
+function IRC:_shouldretry()
+	return not self.intentionaldisconnect and self.options.auto_retry and self.retrycount < self.options.max_retries
 end
 
 function IRC:_toctcp(type, text)
@@ -260,13 +280,13 @@ function IRC:_handlesock(sock)
 		end
 	end)
 	sock:on("error", function (err)
-		self:_disconnected(err)
+		self:_disconnected(err.message, err)
 	end)
 	sock:on("close", function (...)
-		self:_disconnected("Socket closed")
+		self:_disconnected("Socket closed", ...)
 	end)
 	sock:on("end", function (...)
-		self:_disconnected("Socket ended")
+		self:_disconnected("Socket ended", ...)
 	end)
 end
 
