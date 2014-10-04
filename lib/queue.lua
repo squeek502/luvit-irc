@@ -1,15 +1,21 @@
 local Object = require "core".Object
+local Timer = require "timer"
 
 local Queue = Object:extend()
 
 function Queue:initialize(connection, transferlimit)
 	self.connection = connection
 	self.queue = {}
-	self.transferred = 0
-	self.sent = 0
-	self.locked = false
-	self.transferlimit = transferlimit or 1024
-	self.sendlimit = 10
+	self.burstlimit = 4
+	self.send_interval = 2200
+	self.available_sends = self.burstlimit
+
+	self.sendtask = Timer.setInterval(self.send_interval, function()
+		if self.connection.options.flood_protection then
+			self:new_send_available()
+			self:process()
+		end
+	end)
 end
 
 function Queue:push(msg)
@@ -23,23 +29,11 @@ end
 
 function Queue:clear()
 	self.queue = {}
-	self:unlock()
-end
-
-function Queue:lock()
-	self.locked = true
-	self.connection:ping()
-end
-
-function Queue:unlock()
-	self.locked = false
-	self.transferred = 0
-	self.sent = 0
-	self:process()
+	self.available_sends = self.burstlimit
 end
 
 function Queue:isready()
-	return not self.locked and #self.queue > 0
+	return #self.queue > 0
 end
 
 function Queue:peek()
@@ -52,18 +46,21 @@ function Queue:peeksize()
 end
 
 function Queue:cansend()
-	return self.transferred + self:peeksize() <= self.transferlimit and self.sent < self.sendlimit
+	return self.available_sends > 0 or not self.connection.options.flood_protection
+end
+
+function Queue:new_send_available()
+	if self.available_sends < self.burstlimit then
+		self.available_sends = self.available_sends + 1
+	end
 end
 
 function Queue:process()
-	while self:isready() do
-		if self:cansend() then
-			local msg = self:pop()
-			self.connection:_send(msg)
-			self.transferred = self.transferred + msg:size()
-			self.sent = self.sent + 1
-		else
-			self:lock()
+	while self:isready() and self:cansend() do
+		local msg = self:pop()
+		self.connection:_send(msg)
+		if self.connection.options.flood_protection then
+			self.available_sends = self.available_sends - 1
 		end
 	end
 end

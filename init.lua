@@ -70,9 +70,6 @@ function IRC:initialize(server, nick, options)
 			end
 		end
 	end)
-	self:on("pong", function()
-		self.sendqueue:unlock()
-	end)
 end
 
 function IRC:connect(num_retries)
@@ -137,14 +134,8 @@ function IRC:names(channels)
 	self:send(Message:new("NAMES", channels))
 end
 
-function IRC:floodprotection(enabled, interval)
+function IRC:floodprotection(enabled)
 	self.options.flood_protection = enabled
-	if not self.options.flood_protection then
-		for _,unsentmsg in ipairs(self.sendqueue.queue) do
-			self:_send(unsentmsg)
-		end
-	end
-	self.sendqueue:clear()
 end
 
 function IRC:ping()
@@ -159,11 +150,7 @@ function IRC:send(msg)
 	until spillovermsg == nil
 
 	for _,msg in ipairs(msgs) do
-		if self.options.flood_protection then
-			self.sendqueue:push(msg)
-		else
-			self:_send(msg)
-		end
+		self.sendqueue:push(msg)
 	end
 end
 
@@ -280,6 +267,7 @@ function IRC:_disconnected(reason, err, shouldretry)
 	local was_connecting = self.connecting
 	self.connected = false
 	self.connecting = false
+	self.sendqueue:clear()
 	if was_connected or was_connecting then
 		self:emit(was_connected and "disconnect" or "connecterror", reason, err)
 
