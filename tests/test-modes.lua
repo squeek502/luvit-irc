@@ -16,3 +16,7 @@ c:_handlemsg(":portlane.esper.net 353 lubot3 = #test :lubot3 @test")
 
 assert(channel:getuser("test") ~= nil)
 assert_equal(channel, channel:getuser("test").parent)
+
+Modes.clear()
+assert_equal(0, #Modes.flags, Modes.flags)
+assert_equal(nil, Modes["e"])
