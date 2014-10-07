@@ -1,5 +1,7 @@
 local Object = require "core".Object
 local Timer = require "timer"
+local table = require "table"
+local string = require "string"
 
 local Queue = Object:extend()
 

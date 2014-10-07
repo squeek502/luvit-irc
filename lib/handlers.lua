@@ -1,3 +1,5 @@
+local table = require "table"
+local string = require "string"
 local util = require "./util"
 local Modes = require "./modes"
 local Message = require "./message"
