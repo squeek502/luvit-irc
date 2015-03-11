@@ -72,6 +72,7 @@ c:on ("ikick", function (channel, kickedby, reason)
 	print(string.format("Kicked from channel: %s by %s (%s)", channel.name, kickedby, reason))
 end)
 c:on ("names", function(channel)
+	print("Users in channel "..tostring(channel)..":")
 	for nick,user in pairs(channel.users) do
 		print(" "..tostring(user))
 	end

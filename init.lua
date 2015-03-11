@@ -44,6 +44,7 @@ function IRC:initialize(server, nick, options)
 	self.connected = false
 	self.connecting = false
 	self.channels = {}
+	self.current_channels = {}
 	self.retrycount = 0
 	self.retrytask = nil
 	self.intentionaldisconnect = false
@@ -173,7 +174,15 @@ end
 
 function IRC:getchannel(channelname)
 	local identifier = Channel.identifier(channelname)
+	if self.channels[identifier] == nil then
+		self.channels[identifier] = Channel:new(self, channelname)
+	end
 	return self.channels[identifier]
+end
+
+function IRC:is_in_channel(channelname)
+	local identifier = Channel.identifier(channelname)
+	return self.current_channels[identifier] ~= nil
 end
 
 function IRC:isme(nick)
@@ -302,20 +311,19 @@ function IRC:_nickchanged(oldnick, newnick)
 end
 
 function IRC:_addchannel(channelname)
-	assert(self:getchannel(channelname) == nil)
+	assert(not self:is_in_channel(channelname))
 	local identifier = Channel.identifier(channelname)
-	self.channels[identifier] = Channel:new(self, channelname)
+	self.current_channels[identifier] = self:getchannel(channelname)
 end
 
 function IRC:_removechannel(channelname)
-	assert(self:getchannel(channelname) ~= nil)
+	assert(self:is_in_channel(channelname))
 	local identifier = Channel.identifier(channelname)
-	self.channels[identifier]:destroy()
-	self.channels[identifier] = nil
+	self.current_channels[identifier] = nil
 end
 
 function IRC:_clearchannels()
-	for identifier, channel in pairs(self.channels) do
+	for identifier, channel in pairs(self.current_channels) do
 		self:_removechannel(channel.name)
 	end
 end
