@@ -1,10 +1,7 @@
--- author -- pancake@nopcode.org --
--- TODO: check SSL certificate
-
 local instanceof = require('core').instanceof
 local Emitter = require('core').Emitter
 local dns = require('dns')
-local TCP = require('uv').Tcp
+local uv = require('uv')
 local table = require('table')
 local os = require('os')
 local TLS = require('tls', false)
@@ -14,7 +11,8 @@ local util = require('./lib/util')
 local Message = require('./lib/message')
 local Channel = require('./lib/channel')
 local Modes = require('./lib/modes')
-local CTCP = require('./lib/constants').CTCP
+local Constants = require('./lib/constants')
+local CTCP = Constants.CTCP
 local Handlers = require('./lib/handlers')
 local Queue = require('./lib/queue')
 
@@ -160,7 +158,9 @@ function IRC:_send(msg, callback)
 end
 
 function IRC:write(data, callback)
-	self.sock:write(data, callback)
+	if self.sock then
+		self.sock:write(data, callback)
+	end
 end
 
 function IRC:close()
@@ -203,7 +203,7 @@ function IRC:_setupconnection()
 			self:_disconnected("Could not resolve address for "..tostring(self.server), err, false)
 			return
 		end
-		local resolvedip = addresses[1]
+		local resolvedip = addresses[1].address
 		if self.options.ssl then
 			if not TLS then
 				error ("Failed to require ('tls')")
@@ -214,12 +214,10 @@ function IRC:_setupconnection()
 				self:_connect(self.nick, resolvedip)
 			end)
 		else
-			local sock = TCP:new ()
+			local sock = uv.new_tcp ()
 			self.sock = sock
-			sock:connect(resolvedip, self.options.port)
-			self:_handlesock(sock)
-			sock:on("connect", function ()
-				sock:readStart()
+			sock:connect(resolvedip, self.options.port, function(...)
+				self:_handlesock(sock)
 				self:_connect(self.nick, resolvedip)
 			end)
 		end
@@ -227,23 +225,18 @@ function IRC:_setupconnection()
 end
 
 function IRC:_handlesock(sock)
-	sock:on("data", function (data)
-		local lines = self:_splitlines(data)
-		for i = 1, #lines do
-			local line = lines[i]
-			local msg = self:_parsemsg(line)
-			self:_handlemsg(msg)
-			self:emit("data", line)
+	sock:read_start(function(err, data)
+		if not err then
+			local lines = self:_splitlines(data)
+			for i = 1, #lines do
+				local line = lines[i]
+				local msg = self:_parsemsg(line)
+				self:_handlemsg(msg)
+				self:emit("data", line)
+			end
+		else
+			self:_disconnected(err)
 		end
-	end)
-	sock:on("error", function (err)
-		self:_disconnected(err.message, err)
-	end)
-	sock:on("close", function (...)
-		self:_disconnected("Socket closed", ...)
-	end)
-	sock:on("end", function (...)
-		self:_disconnected("Socket ended", ...)
 	end)
 end
 
@@ -266,6 +259,7 @@ function IRC:_connected(welcomemsg, server)
 	self.connecting = false
 	self.connected = true
 	self:_clearchannels()
+	self.sendqueue:start()
 	Modes.clear()
 	self:emit("connect", welcomemsg, server, self.nick)
 end
@@ -353,5 +347,15 @@ function IRC:_handlemsg(msg)
 		self:emit("unhandled", msg)
 	end
 end
+
+IRC.Formatting = require('./lib/formatting')
+IRC.Message = require('./lib/message')
+IRC.Channel = require('./lib/channel')
+IRC.Constants = require('./lib/constants')
+IRC.User = require('./lib/user')
+IRC.Handlers = require('./lib/handlers')
+IRC.Modes = require('./lib/modes')
+IRC.SendQueue = require('./lib/queue')
+IRC.User = require('./lib/user')
 
 return IRC

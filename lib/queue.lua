@@ -11,13 +11,35 @@ function Queue:initialize(connection, transferlimit)
 	self.burstlimit = 4
 	self.send_interval = 2200
 	self.available_sends = self.burstlimit
+	self.enabled = true
+end
 
-	self.sendtask = Timer.setInterval(self.send_interval, function()
-		if self.connection.options.flood_protection then
-			self:new_send_available()
-			self:process()
-		end
-	end)
+function Queue:disable()
+	self.enabled = false
+	self:stop()
+end
+
+function Queue:enable()
+	self.enabled = true
+end
+
+function Queue:stop()
+	if self.sendtask then
+		Timer.clearInterval(self.sendtask)
+	end
+end
+
+function Queue:start()
+	self:stop()
+
+	if self.enabled then
+		self.sendtask = Timer.setInterval(self.send_interval, function()
+			if self.connection.options.flood_protection then
+				self:new_send_available()
+				self:process()
+			end
+		end)
+	end
 end
 
 function Queue:push(msg)

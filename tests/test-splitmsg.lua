@@ -1,19 +1,23 @@
-require("luvit-test/helper")
+require("tap")(function(test)
+	local IRC = require "../"
+	local c = IRC:new()
 
-local c = require "luvit-irc":new()
+	test("splitmsg", function()
+		local splitmsg = c:_splitlines("line without CRNL")
+		assert(0 == #splitmsg)
+		assert("line without CRNL" == c.buffer)
 
-local splitmsg = c:_splitlines("line without CRNL")
-assert_equal(0, #splitmsg)
-assert_equal("line without CRNL", c.buffer)
+		splitmsg = c:_splitlines("line with CRNL\r\n")
+		assert(1 == #splitmsg)
+		assert("" == c.buffer)
 
-splitmsg = c:_splitlines("line with CRNL\r\n")
-assert_equal(1, #splitmsg)
-assert_equal("", c.buffer)
+		splitmsg = c:_splitlines("line with CRNL\r\nand another")
+		assert(1 == #splitmsg)
+		assert("and another" == c.buffer)
 
-splitmsg = c:_splitlines("line with CRNL\r\nand another")
-assert_equal(1, #splitmsg)
-assert_equal("and another", c.buffer)
+		splitmsg = c:_splitlines("line with CRNL\r\nand another with CRNL\r\n")
+		assert(2 == #splitmsg)
+		assert("" == c.buffer)
+	end)
+end)
 
-splitmsg = c:_splitlines("line with CRNL\r\nand another with CRNL\r\n")
-assert_equal(2, #splitmsg)
-assert_equal("", c.buffer)

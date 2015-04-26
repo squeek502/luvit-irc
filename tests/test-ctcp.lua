@@ -1,5 +1,8 @@
-require("luvit-test/helper")
+require("tap")(function(test)
+	local IRC = require "../"
+	local c = IRC:new()
 
-local c = require "luvit-irc":new()
-
-assert(c:_isctcp("\001test\001"))
+	test("isctcp", function()
+		assert(c:_isctcp("\001test\001"))
+	end)
+end)

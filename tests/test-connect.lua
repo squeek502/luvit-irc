@@ -1,17 +1,23 @@
-require("luvit-test/helper")
+require('tap')(function(test)
+	local IRC = require "../"
 
-local c = require "luvit-irc":new()
+	local c = IRC:new()
+	-- necessary to stop the sendqueue's interval blocking the test from finishing
+	c.sendqueue:disable()
 
-local dummymsg = "Dummy welcome message"
-local dummyserver = "dummy.irc.net"
-local dummynick = "dummynick"
+	local dummymsg = "Dummy welcome message"
+	local dummyserver = "dummy.irc.net"
+	local dummynick = "dummynick"
 
-c:on("connect", function(msg, host, nick)
-	assert_equal(dummymsg, msg)
-	assert_equal(dummyserver, host)
-	assert_equal(dummynick, nick)
+	test("connect event handling", function(expect)
+		c:on("connect", expect(function(msg, host, nick)
+			assert(dummymsg == msg)
+			assert(dummyserver == host)
+			assert(dummynick == nick)
+		end))
+
+		c:_handlemsg(":"..dummyserver.." 001 "..dummynick.." :"..dummymsg)
+
+		assert(c.connected, "Recieving a welcome message marks the client as connected")
+	end)
 end)
-
-c:_handlemsg(":"..dummyserver.." 001 "..dummynick.." :"..dummymsg)
-
-assert(c.connected, "Recieving a welcome message marks the client as connected")

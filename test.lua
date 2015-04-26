@@ -1,6 +1,5 @@
-local IRC = require ('luvit-irc')
-local Formatting = require "luvit-irc/lib/formatting"
-local util = require "luvit-irc/lib/util"
+local IRC = require ('.')
+local util = require "./lib/util"
 local string = require "string"
 
 local server = "irc.esper.net"
@@ -78,10 +77,10 @@ c:on ("names", function(channel)
 	end
 end)
 c:on ("pm", function (from, msg)
-	print ("<"..from.."> "..Formatting.convert(msg))
+	print ("<"..from.."> "..IRC.Formatting.convert(msg))
 end)
 c:on ("message", function (from, to, msg)
-	print ("["..to.."] <"..from.."> "..Formatting.convert(msg))
+	print ("["..to.."] <"..from.."> "..IRC.Formatting.convert(msg))
 end)
 c:on ("disconnect", function (reason)
 	print (string.format("Disconnected: %s", reason))
@@ -124,7 +123,6 @@ function irc_cmd (input)
 end
 
 c:connect ()
-process.stdin:readStart ()
-process.stdin:on ("data", function (line)
-	irc_cmd (line)
+process.stdin:on ("data", function (...)
+	irc_cmd (...)
 end)

@@ -1,8 +1,13 @@
 return {
   name = "irc",
-  version = "0.2",
+  version = "0.3.0",
   description = "irc client module for luvit",
-  author = "pancake <pancake@nopcode.org>",
+  author = "squeek",
   dependencies = {
+    "luvit/luvit@2.1.0"
   },
+  files = {
+    "!tests",
+    "**.lua"
+  }
 }
