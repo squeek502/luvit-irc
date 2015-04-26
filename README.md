@@ -25,3 +25,14 @@ c:on ("disconnect", function (disconnectmsg)
 	process.exit (0)
 end)
 ```
+
+Running The Tests
+-----------------
+
+With luvit: `luvit ./tests`
+
+With lit/luvi:
+```
+lit install
+luvi tests .
+```
