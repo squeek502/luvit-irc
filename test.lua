@@ -117,6 +117,10 @@ function irc_cmd (input)
 				c:write (line:sub (2).."\r\n")
 			elseif args[1]:sub(1,1) ~= "/" then
 				c:say ("#", line)
+
+				for _,channel in pairs(c.current_channels) do
+					c:emit("message", c.nick, channel.name, line)
+				end
 			end
 		end
 	end
