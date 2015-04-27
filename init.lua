@@ -1,10 +1,10 @@
 local instanceof = require('core').instanceof
 local Emitter = require('core').Emitter
 local dns = require('dns')
-local uv = require('uv')
+local net = require('net')
 local table = require('table')
 local os = require('os')
-local TLS = require('tls', false)
+local tls = require('tls')
 local string = require('string')
 local Timer = require('timer')
 local util = require('./lib/util')
@@ -205,19 +205,18 @@ function IRC:_setupconnection()
 		end
 		local resolvedip = addresses[1].address
 		if self.options.ssl then
-			if not TLS then
-				error ("Failed to require ('tls')")
-			end
-			TLS.connect (self.options.port, resolvedip, {}, function (err, client)
-				self.sock = client
-				self:_handlesock(client)
+			local options = {host=resolvedip, port=self.options.port}
+			self.sock = tls.connect (options, function()
+				self:_handlesock(self.sock)
 				self:_connect(self.nick, resolvedip)
 			end)
+			self.sock:on('error', function(...)
+				assert(false, ...)
+			end)
 		else
-			local sock = uv.new_tcp ()
-			self.sock = sock
-			sock:connect(resolvedip, self.options.port, function(...)
-				self:_handlesock(sock)
+			self.sock = net.createConnection(self.options.port, resolvedip, function(err)
+				if err then assert(err) end
+				self:_handlesock(self.sock)
 				self:_connect(self.nick, resolvedip)
 			end)
 		end
@@ -225,18 +224,23 @@ function IRC:_setupconnection()
 end
 
 function IRC:_handlesock(sock)
-	sock:read_start(function(err, data)
-		if not err then
-			local lines = self:_splitlines(data)
-			for i = 1, #lines do
-				local line = lines[i]
-				local msg = self:_parsemsg(line)
-				self:_handlemsg(msg)
-				self:emit("data", line)
-			end
-		else
-			self:_disconnected(err)
+	sock:on("data", function (data)
+		local lines = self:_splitlines(data)
+		for i = 1, #lines do
+			local line = lines[i]
+			local msg = self:_parsemsg(line)
+			self:_handlemsg(msg)
+			self:emit("data", line)
 		end
+	end)
+	sock:on("error", function (err)
+		self:_disconnected(err.message, err)
+	end)
+	sock:on("close", function (...)
+		self:_disconnected("Socket closed", ...)
+	end)
+	sock:on("end", function (...)
+		self:_disconnected("Socket ended", ...)
 	end)
 end
 
