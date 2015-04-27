@@ -43,6 +43,7 @@ function IRC:initialize(server, nick, options)
 	self.connecting = false
 	self.channels = {}
 	self.current_channels = {}
+	self.channel_prefixes = {}
 	self.retrycount = 0
 	self.retrytask = nil
 	self.intentionaldisconnect = false
@@ -170,6 +171,10 @@ function IRC:close()
 	else
 		self.sock:close() -- TCP
 	end
+end
+
+function IRC:ischannel(channelname)
+	return type(channelname) == "string" and util.table.contains(self.channel_prefixes, channelname:sub(1, 1))
 end
 
 function IRC:getchannel(channelname)
@@ -309,6 +314,7 @@ function IRC:_nickchanged(oldnick, newnick)
 end
 
 function IRC:_addchannel(channelname)
+	assert(self:ischannel(channelname))
 	assert(not self:is_in_channel(channelname))
 	local identifier = Channel.identifier(channelname)
 	self.current_channels[identifier] = self:getchannel(channelname)

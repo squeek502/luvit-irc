@@ -49,11 +49,15 @@ Handlers["NICK"] = function(irc, msg)
 end
 Handlers["MODE"] = function(irc, msg)
 	local setby = msg.nick
-	local channelname = msg.args[1]
+	local channelname_or_username = msg.args[1]
 	local modes = msg.args[2]
 	local params = util.table.slice(msg.args, 3)
-	local channel = irc:getchannel(channelname)
-	irc:emit("mode", channel, setby, modes, params)
+	if irc:ischannel(channelname_or_username) then
+		local channel = irc:getchannel(channelname_or_username)
+		irc:emit("mode", channelname_or_username, setby, modes, params)
+	else
+		irc:emit("usermode", channelname_or_username, setby, modes, params)
+	end
 end
 Handlers["INVITE"] = function(irc, msg)
 	local from = msg.nick
@@ -214,6 +218,11 @@ Handlers[RPL.ISUPPORT] = function(irc, msg)
 			assert(#flags==#prefixes)
 			for i,flag in ipairs(flags) do
 				Modes.add(flag, Modes.MODETYPE_USERPREFIX, prefixes[i])
+			end
+		elseif key == "CHANTYPES" then
+			irc.channel_prefixes = {}
+			for letter in value:gmatch(".") do 
+				table.insert(irc.channel_prefixes, letter) 
 			end
 		end
 	end

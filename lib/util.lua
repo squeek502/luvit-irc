@@ -89,6 +89,10 @@ utils.table.fallback = function (settings, defaults)
 	end
 end
 
+utils.table.contains = function(tbl, value)
+	return utils.table.findbyvalue(tbl, value) ~= nil
+end
+
 utils.table.findbyvalue = function(tbl, value)
 	if tbl then
 		for i,v in pairs(tbl) do
