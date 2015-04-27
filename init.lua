@@ -90,7 +90,7 @@ end
 
 function IRC:say(target, text)
 	if target == "#" then
-		for channelid,channel in pairs(self.channels) do
+		for channelid,channel in pairs(self.current_channels) do
 			self:say(channel.name, text)
 		end
 		return
