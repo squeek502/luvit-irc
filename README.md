@@ -1,4 +1,4 @@
-luvit-irc
+luvit-irc [![Build Status](https://travis-ci.org/squeek502/luvit-irc.svg?branch=master)](https://travis-ci.org/squeek502/luvit-irc)
 =========
 IRC client module for [luvit](https://luvit.io)
 
