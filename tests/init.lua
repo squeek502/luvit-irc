@@ -28,7 +28,7 @@ repeat
     tap(true)
   end
   local match = string.match(ent.name, "^test%-(.*).lua$")
-  if match then
+  if match and (not args[2] or match == args[2]) then
     local path = "./test-" .. match
     tap(match)
     require(path)

@@ -1,6 +1,6 @@
 luvit-irc
 =========
-IRC client module for luvit
+IRC client module for [luvit](https://luvit.io)
 
 Documentation
 -------------
@@ -31,8 +31,6 @@ Running The Tests
 
 With luvit: `luvit ./tests`
 
-With lit/luvi:
-```
-lit install
-luvi tests .
-```
+With lit/luvi: `luvi tests .`
+
+To only run a specific test (e.g. 'test-message.lua'): `luvit ./tests message` or `luvi tests . -- message`
