@@ -204,11 +204,17 @@ function IRC:_setupconnection()
 	end
 
 	dns.resolve4(self.server, function (err, addresses)
-		if not addresses then
+		local resolvedip
+		for _,a in ipairs(addresses) do
+			if a.address then
+				resolvedip = a.address
+				break
+			end
+		end
+		if not resolvedip then
 			self:_disconnected("Could not resolve address for "..tostring(self.server), err, false)
 			return
 		end
-		local resolvedip = addresses[1].address
 		if self.options.ssl then
 			local options = {host=resolvedip, port=self.options.port}
 			self.sock = tls.connect (options, function()
