@@ -1,6 +1,6 @@
 return {
   name = "squeek502/irc",
-  version = "0.3.2",
+  version = "0.3.3",
   description = "irc client module for luvit",
   keywords = {"irc"},
   homepage = "https://github.com/squeek502/luvit-irc",
@@ -9,7 +9,7 @@ return {
     url = "http://www.ryanliptak.com"
   },
   dependencies = {
-    "luvit/luvit@2.1.1"
+    "luvit/luvit@2.7.2"
   },
   files = {
     "!tests",
