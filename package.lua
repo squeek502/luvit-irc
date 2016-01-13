@@ -1,6 +1,6 @@
 return {
   name = "squeek502/irc",
-  version = "0.3.1",
+  version = "0.3.2",
   description = "irc client module for luvit",
   keywords = {"irc"},
   homepage = "https://github.com/squeek502/luvit-irc",
