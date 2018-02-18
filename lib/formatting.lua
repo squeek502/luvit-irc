@@ -43,7 +43,7 @@ Formatting.stripstyles = function(str)
 end
 
 Formatting.stripbackgrounds = function(str)
-	return str:gsub("("..Formatting.Colors.START.."%d%d?),%d%d?", "%1")
+	return str:gsub("("..Formatting.Colors.START.."%d?%d?),%d%d?", "%1")
 end
 
 Formatting.stripcolors = function(str)
@@ -57,7 +57,7 @@ end
 
 Formatting.colorize = function(text, color, background)
 	return string.format("%s%s%s", 
-		Formatting.Colors.START..color..(background and ","..background or ""),
+		Formatting.Colors.START..(color or "")..(background and ","..background or ""),
 		text,
 		Formatting.Styles.RESET)
 end
@@ -129,6 +129,7 @@ ANSI.ForegroundColors = {
 	LIGHT_MAGENTA = ANSI.bright_fg(ANSI.BaseColors.MAGENTA),
 	GRAY = ANSI.bright_fg(ANSI.BaseColors.BLACK),
 	LIGHT_GRAY = ANSI.dark_fg(ANSI.BaseColors.WHITE),
+	DEFAULT = 39,
 }
 ANSI.BackgroundColors = {
 	WHITE = ANSI.bright_bg(ANSI.BaseColors.WHITE),
@@ -147,6 +148,7 @@ ANSI.BackgroundColors = {
 	LIGHT_MAGENTA = ANSI.bright_bg(ANSI.BaseColors.MAGENTA),
 	GRAY = ANSI.bright_bg(ANSI.BaseColors.BLACK),
 	LIGHT_GRAY = ANSI.dark_bg(ANSI.BaseColors.WHITE),
+	DEFAULT = 49,
 }
 
 ANSI.Styles =
@@ -200,7 +202,8 @@ Formatting.convert = function(text)
 	for colorstring, foreground, background in string.gmatch(text, "(" .. Formatting.Colors.START.."(%d?%d?),?(%d?%d?)" .. ")") do
 		foreground = Formatting.ForegroundColorConversion[Formatting.normalize_color_code(foreground)]
 		background = Formatting.BackgroundColorConversion[Formatting.normalize_color_code(background)]
-		local conversion = ANSI.sgr((foreground or "").. (background and (";" .. background) or ""))
+		local code = (foreground and background) and (foreground .. ";" .. background) or (foreground or background)
+		local conversion = ANSI.sgr(code)
 		table.insert(replacements, {needle=colorstring, replacement=conversion})
 	end
 	for _,replacement in ipairs(replacements) do

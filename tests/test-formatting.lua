@@ -37,6 +37,7 @@ require("tap")(function(test)
 			Formatting.colorize("@", Formatting.Colors.LIGHT_MAGENTA) ..
 			Formatting.colorize("@", Formatting.Colors.GRAY) ..
 			Formatting.colorize("@", Formatting.Colors.LIGHT_GRAY) ..
+			Formatting.colorize("@", nil, Formatting.Colors.DARK_RED) ..
 			Formatting.Styles.RESET .. "@" ..
 			Formatting.stylize("@", Formatting.Styles.BOLD) ..
 			Formatting.stylize("@", Formatting.Styles.UNDERLINE) ..
@@ -44,7 +45,7 @@ require("tap")(function(test)
 			Formatting.stylize("@", Formatting.Styles.REVERSE)
 
 		-- strip formatting
-		assert("@@@@@@@@@@@@@@@@@@@@@" == Formatting.strip(ircformatteststring))
+		assert("@@@@@@@@@@@@@@@@@@@@@@" == Formatting.strip(ircformatteststring))
 
 		local converted = Formatting.convert(ircformatteststring)
 
